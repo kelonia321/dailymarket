@@ -7,13 +7,8 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 ET = ZoneInfo("America/New_York")
-BROWSER_HEADERS = {
-    "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                   "(KHTML, like Gecko) Chrome/128.0 Safari/537.36"),
-    "Accept": "text/csv,text/plain,*/*",
-}
 
-FRED_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={id}&cosd={start}"
+FRED_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={id}"
 HISTORY_YEARS = 6
 
 
@@ -45,19 +40,28 @@ def trim_to_session(series, now_et=None):
     return series[series.index.date <= cutoff]
 
 
-def fred(series_id, retries=3, wait=3):
-    import requests
+def _curl_get(url, timeout):
+    """GitHub 서버에서 성공이 확인된 방식 그대로: curl 기본 요청 (식별자 변경 없음)."""
+    import subprocess
+    r = subprocess.run(["curl", "-sS", "-f", "-L", "-m", str(timeout), url],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"curl 오류 {r.returncode}: {r.stderr.strip()}")
+    return r.stdout
+
+
+def fred(series_id, retries=2, wait=3, getter=None, timeout=30):
+    getter = getter or _curl_get
     last = None
     for i in range(retries):
         try:
-            r = requests.get(FRED_URL.format(id=series_id, start=_start()), timeout=60,
-                             headers=BROWSER_HEADERS)
-            r.raise_for_status()
-            head = r.text[:200]
+            text = getter(FRED_URL.format(id=series_id), timeout)
+            head = text[:200]
             first_line = head.splitlines()[0] if head.strip() else ""
             if series_id not in first_line:
-                raise RuntimeError(f"CSV가 아닌 응답 (HTTP {r.status_code}): {head[:120]!r}")
-            return parse_fred_csv(r.text)
+                raise RuntimeError(f"CSV가 아닌 응답: {head[:120]!r}")
+            s = parse_fred_csv(text)
+            return s[s.index >= pd.Timestamp(_start())]
         except Exception as e:  # noqa: BLE001
             last = e
             if i < retries - 1:
