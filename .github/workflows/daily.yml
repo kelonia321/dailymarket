@@ -16,9 +16,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -32,10 +32,7 @@ jobs:
       - name: FRED connection check
         continue-on-error: true
         run: |
-          URL="https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS10"
-          echo "기본 요청: $(curl -s -o /dev/null -w '%{http_code}' -m 60 "$URL")"
-          echo "브라우저 요청: $(curl -s -o /dev/null -w '%{http_code}' -m 60 -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0' "$URL")"
-          curl -s -m 60 -A 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0' "$URL" | head -3
+          echo "FRED 응답 코드: $(curl -s -o /dev/null -w '%{http_code}' -m 30 'https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS10')"
 
       - name: Build dashboard
         run: python main.py
