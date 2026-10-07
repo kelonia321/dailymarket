@@ -1,0 +1,40 @@
+{
+  "lookback_days": 1260,
+  "change_window": 20,
+  "level_weight": 0.4,
+  "change_weight": 0.6,
+  "min_history": 260,
+  "bei_anchor": 2.25,
+  "regime_eps_bp": 5,
+  "min_valid_indicators": 5,
+  "stale_bdays": 3,
+  "groups": {
+    "rates":  {"name": "금리 구성",   "weight": 35},
+    "credit": {"name": "신용·변동성", "weight": 25},
+    "risk":   {"name": "위험자산",    "weight": 25},
+    "commod": {"name": "원자재",      "weight": 15}
+  },
+  "indicators": [
+    {"id": "dgs10", "name": "10년물 명목금리", "group": "rates", "direction": "lower", "transform": "diff", "fmt": "rate",
+     "sources": [{"type": "fred", "id": "DGS10"}]},
+    {"id": "real10", "name": "10년물 실질금리 (TIPS)", "group": "rates", "direction": "lower", "transform": "diff", "fmt": "rate",
+     "sources": [{"type": "fred", "id": "DFII10"}]},
+    {"id": "bei10", "name": "10년 기대 인플레이션 (BEI)", "group": "rates", "direction": "anchor", "transform": "diff", "fmt": "rate",
+     "sources": [{"type": "fred", "id": "T10YIE"}]},
+    {"id": "tp10", "name": "10년 기간 프리미엄", "group": "rates", "direction": "lower", "transform": "diff", "fmt": "rate",
+     "sources": [{"type": "fred", "id": "THREEFYTP10"}]},
+    {"id": "hy", "name": "하이일드 스프레드", "group": "credit", "direction": "lower", "transform": "diff", "fmt": "spread",
+     "sources": [{"type": "fred", "id": "BAMLH0A0HYM2"}]},
+    {"id": "vix", "name": "VIX", "group": "credit", "direction": "lower", "transform": "diff", "fmt": "index",
+     "sources": [{"type": "yahoo", "id": "^VIX"}, {"type": "fred", "id": "VIXCLS"}]},
+    {"id": "spx", "name": "S&P 500", "group": "risk", "direction": "higher", "transform": "log", "fmt": "price",
+     "sources": [{"type": "yahoo", "id": "^GSPC"}, {"type": "fred", "id": "SP500"}]},
+    {"id": "xlyxlp", "name": "경기민감/방어 (XLY/XLP)", "group": "risk", "direction": "higher", "transform": "log", "fmt": "ratio",
+     "sources": [{"type": "yahoo_ratio", "num": "XLY", "den": "XLP"}]},
+    {"id": "cuau", "name": "구리/금 비율", "group": "commod", "direction": "higher", "transform": "log", "fmt": "ratio",
+     "sources": [{"type": "yahoo_ratio", "num": "HG=F", "den": "GC=F"}]},
+    {"id": "wti", "name": "WTI 유가", "group": "commod", "direction": "lower", "transform": "log", "fmt": "usd",
+     "sources": [{"type": "yahoo", "id": "CL=F"}, {"type": "fred", "id": "DCOILWTICO"}]}
+  ],
+  "aux": {"curve": {"type": "fred", "id": "T10Y2Y"}}
+}
