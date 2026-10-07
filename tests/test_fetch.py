@@ -55,21 +55,40 @@ def test_failure_reason_is_logged(capsys):
     out = capsys.readouterr().out
     assert "FRED DGS10" in out and "HTTP 403 차단" in out
 
-def test_fred_rejects_html_response(monkeypatch):
-    import requests
-    monkeypatch.setattr(requests, "get", lambda *a, **k: _Resp("<html>Access Denied</html>"))
+def test_fred_rejects_html_response():
     with pytest.raises(RuntimeError, match="CSV가 아닌 응답"):
-        F.fred("DGS10", retries=1, wait=0)
+        F.fred("DGS10", retries=1, wait=0, getter=lambda url, timeout: "<html>Access Denied</html>")
 
-def test_fred_sends_browser_user_agent(monkeypatch):
-    import requests
+def test_fred_uses_plain_url_without_date_filter():
     seen = {}
-    def get(url, **k):
-        seen.update(k.get("headers", {}))
-        return _Resp("observation_date,DGS10\n2026-10-06,4.1\n")
-    monkeypatch.setattr(requests, "get", get)
-    F.fred("DGS10", retries=1, wait=0)
-    assert "Mozilla" in seen["User-Agent"]
+    def getter(url, timeout):
+        seen["url"] = url
+        return "observation_date,DGS10\n2026-10-06,4.1\n"
+    F.fred("DGS10", retries=1, wait=0, getter=getter)
+    assert seen["url"] == "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS10"
+
+def test_fred_keeps_only_recent_years():
+    txt = "observation_date,DGS10\n1990-01-02,8.0\n2026-10-06,4.1\n"
+    s = F.fred("DGS10", retries=1, wait=0, getter=lambda u, timeout: txt)
+    assert list(s.values) == [4.1]
+
+def test_curl_command_has_no_custom_user_agent(monkeypatch):
+    import subprocess
+    seen = {}
+    class R: returncode, stdout, stderr = 0, "ok", ""
+    def run(cmd, **k):
+        seen["cmd"] = cmd
+        return R()
+    monkeypatch.setattr(subprocess, "run", run)
+    F._curl_get("https://example.com", 30)
+    assert "-A" not in seen["cmd"] and "--user-agent" not in seen["cmd"]
+
+def test_curl_failure_raises_with_reason(monkeypatch):
+    import subprocess
+    class R: returncode, stdout, stderr = 28, "", "Operation timed out"
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **k: R())
+    with pytest.raises(RuntimeError, match="timed out"):
+        F._curl_get("https://example.com", 30)
 
 @pytest.mark.parametrize("now,last", [
     (dt.datetime(2026, 10, 7, 1, 44), dt.date(2026, 10, 6)),   # 장 시작 전 → 전일
@@ -84,8 +103,6 @@ def test_trim_drops_incomplete_bar():
     out = F.trim_to_session(s, dt.datetime(2026, 10, 7, 1, 44))
     assert list(out.index.date) == [dt.date(2026, 10, 5), dt.date(2026, 10, 6)]
 
-def test_fred_empty_body_is_clear_error(monkeypatch):
-    import requests
-    monkeypatch.setattr(requests, "get", lambda *a, **k: _Resp(""))
+def test_fred_empty_body_is_clear_error():
     with pytest.raises(RuntimeError, match="CSV가 아닌 응답"):
-        F.fred("DGS10", retries=1, wait=0)
+        F.fred("DGS10", retries=1, wait=0, getter=lambda u, timeout: "")
